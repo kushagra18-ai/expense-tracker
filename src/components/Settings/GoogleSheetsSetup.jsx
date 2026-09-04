@@ -1,119 +1,253 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGoogleSheets } from '../../contexts/GoogleSheetsContext';
-import { Cloud, CloudOff, RefreshCw, ExternalLink, Save, CheckCircle2, XCircle } from 'lucide-react';
+import { Cloud, RefreshCw, Save, CheckCircle2, XCircle, AlertCircle, LogIn, LogOut, ExternalLink } from 'lucide-react';
 import { timeAgo } from '../../utils/formatters';
 import { useToast } from '../common/Toast';
 
 export default function GoogleSheetsSetup() {
-  const { isConnected, spreadsheetUrl, clientId, lastSynced, syncStatus, setClientId, setSheetUrl, connect, disconnect, syncNow, autoSync, setAutoSync } = useGoogleSheets();
-  const [localClientId, setLocalClientId] = useState(clientId || '');
-  const [localSheetUrl, setLocalSheetUrl] = useState(spreadsheetUrl || '');
+  const {
+    isConnected, spreadsheetUrl, clientId,
+    lastSynced, syncStatus, syncError,
+    initialized, autoSync,
+    setClientId, setSheetUrl,
+    connect, disconnect, syncNow, setAutoSync,
+  } = useGoogleSheets();
+
   const { showToast } = useToast();
 
-  const handleSave = () => {
-    setClientId(localClientId);
-    setSheetUrl(localSheetUrl);
-    showToast('Google Sheets credentials saved', 'success');
-  };
+  // Bug 2 fix: sync localClientId and localSheetUrl from context whenever
+  // context values load asynchronously from storage (they start as '' and
+  // resolve after the initial useEffect in GoogleSheetsContext runs).
+  const [localClientId, setLocalClientId] = useState('');
+  const [localSheetUrl, setLocalSheetUrl] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [connecting, setConnecting] = useState(false);
 
-  const handleSync = async () => {
+  useEffect(() => {
+    if (clientId) setLocalClientId(clientId);
+  }, [clientId]);
+
+  useEffect(() => {
+    if (spreadsheetUrl) setLocalSheetUrl(spreadsheetUrl);
+  }, [spreadsheetUrl]);
+
+  // Bug 1 + 4 fix: await setClientId (which calls initGoogleAuth) before
+  // calling setSheetUrl, and only show success toast when both succeed.
+  const handleSave = async () => {
+    if (!localClientId.trim()) {
+      showToast('Please enter your OAuth 2.0 Client ID', 'error');
+      return;
+    }
+    setSaving(true);
     try {
-      await syncNow();
-      showToast('Synced successfully with Google Sheets', 'success');
+      await setClientId(localClientId.trim());
+      if (localSheetUrl.trim()) {
+        await setSheetUrl(localSheetUrl.trim());
+      }
+      showToast('Settings saved — now click Connect', 'success');
     } catch (err) {
-      showToast('Sync failed', 'error');
+      showToast('Failed to initialize Google Auth: ' + err.message, 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
+  const handleConnect = async () => {
+    // Bug 3 fix: always call save first if the text fields are dirty
+    if (!initialized) {
+      showToast('Click "Save Settings" first to initialize auth', 'warning');
+      return;
+    }
+    if (!localSheetUrl.trim()) {
+      showToast('Enter your Google Sheet URL before connecting', 'warning');
+      return;
+    }
+    setConnecting(true);
+    try {
+      // Ensure the sheet URL is persisted
+      await setSheetUrl(localSheetUrl.trim());
+      // Opens the Google OAuth popup
+      connect();
+      // connect() is synchronous (fires popup) — auth result comes via callback
+      showToast('Google sign-in popup opened. Complete sign-in to connect.', 'info');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnect = () => {
+    disconnect();
+    showToast('Disconnected from Google Sheets', 'success');
+  };
+
+  const handleSync = async () => {
+    const result = await syncNow();
+    if (result?.success) {
+      showToast(`Synced! ${result.added} added, ${result.updated} updated`, 'success');
+    } else {
+      showToast('Sync failed: ' + (result?.error || 'Unknown error'), 'error');
+    }
+  };
+
+  // Derived state
+  const clientIdDirty = localClientId.trim() !== (clientId || '').trim();
+  const sheetUrlDirty = localSheetUrl.trim() !== (spreadsheetUrl || '').trim();
+  const hasDirtyFields = clientIdDirty || sheetUrlDirty;
+
   return (
     <div className="sheets-setup">
-      <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Connection Status</span>
+
+      {/* ── Status Banner ── */}
+      <div className="sync-status-banner">
         {isConnected ? (
-          <span className="status-badge connected">
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor' }}></span>
-            Connected to Google Sheets
-          </span>
+          <div className="status-row connected">
+            <CheckCircle2 size={18} />
+            <span>Connected to Google Sheets</span>
+            {lastSynced && (
+              <span className="last-sync-time">Last synced {timeAgo(lastSynced)}</span>
+            )}
+          </div>
         ) : (
-          <span className="status-badge disconnected">
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor' }}></span>
-            Not Connected
-          </span>
+          <div className="status-row disconnected">
+            <XCircle size={18} />
+            <span>Not connected — complete setup below</span>
+          </div>
         )}
       </div>
 
-      <div style={{ background: 'rgba(0,0,0,0.15)', padding: '1.25rem', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem', border: '1px solid var(--glass-border)' }}>
-        <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          Setup Instructions
-        </h4>
-        <ol style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.6' }}>
-          <li style={{ marginBottom: '0.5rem' }}>Create a Google Cloud Project and enable Google Sheets API.</li>
-          <li style={{ marginBottom: '0.5rem' }}>Create an OAuth 2.0 Client ID for Web application.</li>
-          <li style={{ marginBottom: '0.5rem' }}>Create a new Google Sheet and copy its URL.</li>
-          <li>Paste the Client ID and URL below.</li>
-        </ol>
-      </div>
+      {/* ── Step 1: Credentials ── */}
+      <div className="setup-step">
+        <div className="step-header">
+          <span className={`step-badge ${initialized ? 'done' : 'pending'}`}>
+            {initialized ? <CheckCircle2 size={13} /> : '1'}
+          </span>
+          <h4>Google OAuth Credentials</h4>
+        </div>
 
-      <div className="form-group">
-        <label>OAuth 2.0 Client ID</label>
-        <input 
-          type="text" 
-          className="form-control" 
-          value={localClientId} 
-          onChange={(e) => setLocalClientId(e.target.value)} 
-          placeholder="Enter your Client ID here"
-        />
-      </div>
+        <div className="step-help">
+          <a
+            href="https://console.cloud.google.com/apis/credentials"
+            target="_blank"
+            rel="noreferrer"
+            className="help-link"
+          >
+            <ExternalLink size={13} /> Open Google Cloud Console
+          </a>
+          <span className="help-text">
+            Create an OAuth 2.0 Client ID for a <strong>Web application</strong> and add <code>{window.location.origin}</code> as an Authorized JavaScript Origin.
+          </span>
+        </div>
 
-      <div className="form-group">
-        <label>Google Spreadsheet URL</label>
-        <input 
-          type="text" 
-          className="form-control" 
-          value={localSheetUrl} 
-          onChange={(e) => setLocalSheetUrl(e.target.value)} 
-          placeholder="https://docs.google.com/spreadsheets/d/..."
-        />
-      </div>
+        <div className="form-group" style={{ marginTop: '1rem' }}>
+          <label>OAuth 2.0 Client ID</label>
+          <input
+            type="text"
+            className="form-control"
+            value={localClientId}
+            onChange={e => setLocalClientId(e.target.value)}
+            placeholder="xxxxxxxx.apps.googleusercontent.com"
+            autoComplete="off"
+            spellCheck="false"
+          />
+        </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        <button className="btn btn-secondary" onClick={handleSave} style={{ flex: 1 }}>
-          <Save size={18} /> Save Config
+        <div className="form-group">
+          <label>Google Spreadsheet URL</label>
+          <input
+            type="text"
+            className="form-control"
+            value={localSheetUrl}
+            onChange={e => setLocalSheetUrl(e.target.value)}
+            placeholder="https://docs.google.com/spreadsheets/d/..."
+            autoComplete="off"
+            spellCheck="false"
+          />
+          <span className="field-hint">Paste the full URL of your Google Sheet</span>
+        </div>
+
+        <button
+          className={`btn btn-primary save-btn ${saving ? 'loading' : ''} ${hasDirtyFields ? 'dirty' : ''}`}
+          onClick={handleSave}
+          disabled={saving || !localClientId.trim()}
+        >
+          {saving ? <RefreshCw size={16} className="spin" /> : <Save size={16} />}
+          {saving ? 'Saving…' : hasDirtyFields ? 'Save Settings *' : 'Save Settings'}
         </button>
-        {!isConnected ? (
-          <button className="btn btn-primary" onClick={connect} disabled={!localClientId} style={{ flex: 1 }}>
-            Connect
-          </button>
-        ) : (
-          <button className="btn btn-danger" onClick={disconnect} style={{ flex: 1 }}>
-            Disconnect
-          </button>
-        )}
       </div>
 
+      {/* ── Step 2: Sign In ── */}
+      <div className={`setup-step ${!initialized ? 'step-disabled' : ''}`}>
+        <div className="step-header">
+          <span className={`step-badge ${isConnected ? 'done' : initialized ? 'ready' : 'pending'}`}>
+            {isConnected ? <CheckCircle2 size={13} /> : '2'}
+          </span>
+          <h4>Sign in with Google</h4>
+        </div>
+
+        {!initialized && (
+          <p className="step-note">Complete Step 1 first to enable sign-in.</p>
+        )}
+
+        <div className="connect-row">
+          {!isConnected ? (
+            <button
+              className="btn btn-google"
+              onClick={handleConnect}
+              disabled={!initialized || connecting}
+            >
+              <LogIn size={16} />
+              {connecting ? 'Opening popup…' : 'Connect Google Account'}
+            </button>
+          ) : (
+            <button className="btn btn-danger-soft" onClick={handleDisconnect}>
+              <LogOut size={16} />
+              Disconnect
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Step 3: Sync ── */}
       {isConnected && (
-        <div style={{ padding: '1.25rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              Last Synced: {lastSynced ? <strong style={{color:'var(--text-primary)'}}>{timeAgo(lastSynced)}</strong> : 'Never'}
-            </span>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer' }}>
-              <input 
-                type="checkbox" 
-                checked={autoSync} 
-                onChange={(e) => {
+        <div className="setup-step">
+          <div className="step-header">
+            <span className="step-badge done"><CheckCircle2 size={13} /></span>
+            <h4>Sync</h4>
+          </div>
+
+          <div className="sync-options">
+            <label className="auto-sync-toggle">
+              <span>Auto-sync on every expense</span>
+              <input
+                type="checkbox"
+                checked={autoSync}
+                onChange={e => {
                   setAutoSync(e.target.checked);
-                  showToast(`Auto sync ${e.target.checked ? 'enabled' : 'disabled'}`, 'success');
-                }} 
+                  showToast(`Auto sync ${e.target.checked ? 'on' : 'off'}`, 'success');
+                }}
                 style={{ accentColor: 'var(--accent-primary)' }}
               />
-              Auto Sync
             </label>
+
+            {syncError && (
+              <div className="sync-error-msg">
+                <AlertCircle size={15} />
+                <span>{syncError}</span>
+              </div>
+            )}
+
+            <button
+              className="btn btn-primary"
+              onClick={handleSync}
+              disabled={syncStatus === 'syncing'}
+              style={{ width: '100%' }}
+            >
+              <RefreshCw size={16} className={syncStatus === 'syncing' ? 'spin' : ''} />
+              {syncStatus === 'syncing' ? 'Syncing…' : 'Pull from Sheet Now'}
+            </button>
           </div>
-          <button className="btn btn-primary" onClick={handleSync} disabled={syncStatus === 'syncing'} style={{ width: '100%' }}>
-            <RefreshCw size={18} className={syncStatus === 'syncing' ? 'spin' : ''} /> 
-            {syncStatus === 'syncing' ? 'Syncing...' : 'Sync Now'}
-          </button>
         </div>
       )}
     </div>
