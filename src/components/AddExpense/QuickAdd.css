@@ -1,0 +1,65 @@
+.quick-add-container {
+  margin-bottom: 1.5rem;
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px dashed rgba(16, 185, 129, 0.3);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+}
+
+.quick-add-header {
+  margin-bottom: 0.75rem;
+}
+
+.quick-add-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.quick-add-scroll {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.quick-add-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.quick-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  border-radius: 9999px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-add-btn:hover, .quick-add-btn:active {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-primary);
+  transform: scale(0.98);
+}
+
+.quick-add-btn.settings-btn {
+  color: var(--text-secondary);
+  background: transparent;
+  border-style: dashed;
+}
+
+.quick-add-btn.settings-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}

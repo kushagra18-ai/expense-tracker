@@ -1,0 +1,248 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useExpenses } from '../../contexts/ExpenseContext';
+import { useSettings } from '../../contexts/SettingsContext';
+import { formatDateInput } from '../../utils/formatters';
+import { PAYMENT_METHODS } from '../../utils/categories';
+import QuickAdd from './QuickAdd';
+import { useToast } from '../common/Toast';
+import './AddExpensePage.css';
+
+const AddExpensePage = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { expenses, addExpense, editExpense, removeExpense } = useExpenses();
+  const { categories, quickAddCategories } = useSettings();
+  const { showToast } = useToast();
+
+  const isEditMode = Boolean(id);
+
+  const [formData, setFormData] = useState({
+    amount: '',
+    categoryId: '',
+    subcategoryId: '',
+    date: formatDateInput(new Date()),
+    description: '',
+    paymentMethod: 'UPI',
+    isFixed: false
+  });
+  
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (isEditMode) {
+      const exp = expenses.find(e => e.id === id);
+      if (exp) {
+        setFormData({
+          amount: exp.amount.toString(),
+          categoryId: exp.categoryId,
+          subcategoryId: exp.subcategoryId,
+          date: exp.date,
+          description: exp.description || '',
+          paymentMethod: exp.paymentMethod,
+          isFixed: exp.isFixed
+        });
+      }
+    } else {
+      if (categories?.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          categoryId: categories[0].id,
+          subcategoryId: categories[0].subcategories[0]?.id || ''
+        }));
+      }
+    }
+  }, [id, isEditMode, expenses, categories]);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setError(false);
+    
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      };
+      
+      // Auto-update subcategory if category changes
+      if (name === 'categoryId') {
+        const cat = categories.find(c => c.id === value);
+        if (cat && cat.subcategories.length > 0) {
+          newData.subcategoryId = cat.subcategories[0].id;
+        } else {
+          newData.subcategoryId = '';
+        }
+      }
+      return newData;
+    });
+  };
+
+  const handleQuickAddSelect = (selected) => {
+    setFormData(prev => ({
+      ...prev,
+      categoryId: selected.categoryId,
+      subcategoryId: selected.subcategoryId,
+      isFixed: selected.isFixed || false
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.amount || isNaN(formData.amount) || Number(formData.amount) <= 0) {
+      setError(true);
+      showToast('Please enter a valid amount', 'error');
+      return;
+    }
+
+    try {
+      if (isEditMode) {
+        const { syncResult } = await editExpense(id, { ...formData, amount: Number(formData.amount) });
+        showToast('Expense updated', 'success');
+        if (syncResult && !syncResult.success) {
+          showToast('Saved locally. Sheet sync failed: ' + syncResult.error, 'warning');
+        }
+      } else {
+        const { syncResult } = await addExpense({ ...formData, amount: Number(formData.amount) });
+        showToast('Expense added', 'success');
+        if (syncResult && !syncResult.success) {
+          showToast('Saved locally. Sheet sync failed: ' + syncResult.error, 'warning');
+        }
+      }
+      navigate(-1);
+    } catch (err) {
+      showToast('Error saving expense', 'error');
+    }
+  };
+
+  const handleDelete = () => {
+    if (window.confirm('Delete this expense?')) {
+      removeExpense(id);
+      showToast('Expense deleted', 'success');
+      navigate(-1);
+    }
+  };
+
+  const selectedCategory = categories?.find(c => c.id === formData.categoryId);
+
+  return (
+    <div className="add-expense-page">
+      <div className="header-actions">
+        <button type="button" className="btn-cancel" onClick={() => navigate(-1)}>Cancel</button>
+        <h2>{isEditMode ? 'Edit Expense' : 'Add Expense'}</h2>
+        {isEditMode ? (
+          <button type="button" className="btn-delete-header" onClick={handleDelete}>Delete</button>
+        ) : (
+          <div style={{ width: '45px' }}></div>
+        )}
+      </div>
+
+      {!isEditMode && (
+        <QuickAdd 
+          quickAddItems={quickAddCategories} 
+          categories={categories}
+          onSelect={handleQuickAddSelect} 
+        />
+      )}
+
+      <form onSubmit={handleSubmit} className="add-expense-form glass-card">
+        <div className={`form-group amount-group ${error ? 'has-error' : ''}`}>
+          <span className="currency-symbol">₹</span>
+          <input
+            type="number"
+            name="amount"
+            className="amount-input"
+            placeholder="0"
+            value={formData.amount}
+            onChange={handleChange}
+            inputMode="decimal"
+            autoFocus
+            required
+          />
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Category</label>
+            <select name="categoryId" value={formData.categoryId} onChange={handleChange} required className="custom-select">
+              {categories?.map(c => (
+                <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>Subcategory</label>
+            <select name="subcategoryId" value={formData.subcategoryId} onChange={handleChange} required className="custom-select">
+              {selectedCategory?.subcategories.map(sc => (
+                <option key={sc.id} value={sc.id}>{sc.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Date</label>
+          <input
+            type="date"
+            name="date"
+            value={formData.date}
+            onChange={handleChange}
+            required
+            className="custom-input"
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Description</label>
+          <input
+            type="text"
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            placeholder="What was this for?"
+            className="custom-input"
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Payment Method</label>
+          <div className="pill-group payment-methods">
+            {PAYMENT_METHODS?.map(pm => (
+              <button
+                type="button"
+                key={pm}
+                className={`filter-pill pm-btn ${formData.paymentMethod === pm ? 'active' : ''}`}
+                onClick={() => setFormData(prev => ({ ...prev, paymentMethod: pm }))}
+              >
+                {pm}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="form-group toggle-group">
+          <label className="toggle-label">
+            <div>
+              <span className="toggle-title">Fixed Expense</span>
+              <span className="toggle-desc">Occurs regularly (rent, subs)</span>
+            </div>
+            <input
+              type="checkbox"
+              name="isFixed"
+              checked={formData.isFixed}
+              onChange={handleChange}
+              className="toggle-input"
+            />
+            <div className="toggle-slider"></div>
+          </label>
+        </div>
+
+        <button type="submit" className="btn-submit">
+          {isEditMode ? 'Update Expense' : 'Save Expense'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
+export default AddExpensePage;
