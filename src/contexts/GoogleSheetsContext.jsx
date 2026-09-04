@@ -48,6 +48,17 @@ export function GoogleSheetsProvider({ children }) {
 
   const handleAuthChange = useCallback(({ authenticated }) => {
     setIsConnected(authenticated);
+    // Auto-create sheet tabs the moment the user connects
+    if (authenticated) {
+      storage.getSetting('spreadsheetId').then(sheetId => {
+        if (sheetId) {
+          import('../services/googleSheets').then(({ createExpensesSheet, createDashboardSheet }) => {
+            createExpensesSheet(sheetId).catch(console.warn);
+            createDashboardSheet(sheetId).catch(console.warn);
+          });
+        }
+      });
+    }
   }, []);
 
   const setClientId = useCallback(async (id) => {

@@ -16,6 +16,9 @@ const AddExpensePage = () => {
   const { showToast } = useToast();
 
   const isEditMode = Boolean(id);
+  // Guard: only fill the edit form once (the first time the expense is found).
+  // Prevents any subsequent re-render from clobbering the user's in-progress edits.
+  const filledRef = React.useRef(false);
 
   const [formData, setFormData] = useState({
     amount: '',
@@ -29,34 +32,39 @@ const AddExpensePage = () => {
   
   const [error, setError] = useState(false);
 
-  // In edit mode: pre-fill form from the expense once it's found
-  // Dependencies deliberately exclude `categories` so that async category
-  // loading does NOT overwrite already-loaded expense data.
+  // Reset the fill-guard whenever we navigate to a different expense
+  useEffect(() => { filledRef.current = false; }, [id]);
+
+  // Edit mode: fill form when expense is found in the (async-loaded) array.
+  // `expenses` is in deps so we retry once data arrives from IndexedDB.
+  // `filledRef` ensures we only ever fill once — subsequent renders (e.g.
+  // when `categories` loads) won't overwrite what the user has typed.
   useEffect(() => {
     if (!isEditMode) return;
+    if (filledRef.current) return;          // already filled — don't overwrite
     const exp = expenses.find(e => e.id === id);
-    if (exp) {
-      setFormData({
-        amount: exp.amount.toString(),
-        categoryId: exp.categoryId || '',
-        subcategoryId: exp.subcategoryId || '',
-        date: exp.date,
-        description: exp.description || '',
-        paymentMethod: exp.paymentMethod || 'UPI',
-        isFixed: !!exp.isFixed
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, isEditMode]); // intentionally omit `expenses` after first load
+    if (!exp) return;                       // not loaded yet — wait for next render
+    filledRef.current = true;
+    setFormData({
+      amount: exp.amount.toString(),
+      categoryId: exp.categoryId || '',
+      subcategoryId: exp.subcategoryId || '',
+      date: exp.date,
+      description: exp.description || '',
+      paymentMethod: exp.paymentMethod || 'UPI',
+      isFixed: !!exp.isFixed,
+    });
+  }, [id, isEditMode, expenses]);
 
-  // In add mode: set default category/subcategory once categories are ready
+  // Add mode: set default category/subcategory once categories load.
+  // Skipped entirely in edit mode.
   useEffect(() => {
     if (isEditMode) return;
     if (categories?.length > 0) {
       setFormData(prev => ({
         ...prev,
         categoryId: prev.categoryId || categories[0].id,
-        subcategoryId: prev.subcategoryId || categories[0].subcategories[0]?.id || ''
+        subcategoryId: prev.subcategoryId || categories[0].subcategories[0]?.id || '',
       }));
     }
   }, [isEditMode, categories]);

@@ -58,6 +58,14 @@ export async function sheetExists(spreadsheetId, sheetName) {
 }
 
 /**
+ * Ensure the Expenses sheet tab exists with the correct headers.
+ * Safe to call repeatedly — it no-ops if the tab already exists.
+ */
+export async function ensureExpensesSheet(spreadsheetId) {
+  return createExpensesSheet(spreadsheetId);
+}
+
+/**
  * Create the Expenses sheet with headers
  */
 export async function createExpensesSheet(spreadsheetId) {
@@ -158,6 +166,9 @@ export async function createDashboardSheet(spreadsheetId) {
  * Append an expense row to the Expenses sheet
  */
 export async function appendExpenseToSheet(spreadsheetId, expense) {
+  // Auto-create sheet tab + headers if this is the first write
+  await ensureExpensesSheet(spreadsheetId);
+
   const row = [
     expense.id,
     formatDateForSheet(expense.date),
@@ -264,9 +275,12 @@ export async function deleteExpenseFromSheet(spreadsheetId, expenseId) {
 }
 
 /**
- * Fetch all expenses from the sheet
+ * Fetch all expenses from the sheet.
+ * Auto-creates the Expenses tab + headers if they don't exist yet.
  */
 export async function fetchAllExpensesFromSheet(spreadsheetId) {
+  // Ensure the sheet tab exists before reading — fixes "Unable to parse range"
+  await ensureExpensesSheet(spreadsheetId);
   const data = await sheetsRequest(`/${spreadsheetId}/values/Expenses!A2:I`);
   const rows = data.values || [];
   
