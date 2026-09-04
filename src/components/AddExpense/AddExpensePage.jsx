@@ -29,30 +29,37 @@ const AddExpensePage = () => {
   
   const [error, setError] = useState(false);
 
+  // In edit mode: pre-fill form from the expense once it's found
+  // Dependencies deliberately exclude `categories` so that async category
+  // loading does NOT overwrite already-loaded expense data.
   useEffect(() => {
-    if (isEditMode) {
-      const exp = expenses.find(e => e.id === id);
-      if (exp) {
-        setFormData({
-          amount: exp.amount.toString(),
-          categoryId: exp.categoryId,
-          subcategoryId: exp.subcategoryId,
-          date: exp.date,
-          description: exp.description || '',
-          paymentMethod: exp.paymentMethod,
-          isFixed: exp.isFixed
-        });
-      }
-    } else {
-      if (categories?.length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          categoryId: categories[0].id,
-          subcategoryId: categories[0].subcategories[0]?.id || ''
-        }));
-      }
+    if (!isEditMode) return;
+    const exp = expenses.find(e => e.id === id);
+    if (exp) {
+      setFormData({
+        amount: exp.amount.toString(),
+        categoryId: exp.categoryId || '',
+        subcategoryId: exp.subcategoryId || '',
+        date: exp.date,
+        description: exp.description || '',
+        paymentMethod: exp.paymentMethod || 'UPI',
+        isFixed: !!exp.isFixed
+      });
     }
-  }, [id, isEditMode, expenses, categories]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isEditMode]); // intentionally omit `expenses` after first load
+
+  // In add mode: set default category/subcategory once categories are ready
+  useEffect(() => {
+    if (isEditMode) return;
+    if (categories?.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        categoryId: prev.categoryId || categories[0].id,
+        subcategoryId: prev.subcategoryId || categories[0].subcategories[0]?.id || ''
+      }));
+    }
+  }, [isEditMode, categories]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -230,12 +237,12 @@ const AddExpensePage = () => {
           </div>
         </div>
 
-        <div className="form-group toggle-group">
-          <label className="toggle-label">
-            <div>
-              <span className="toggle-title">Fixed Expense</span>
-              <span className="toggle-desc">Occurs regularly (rent, subs)</span>
-            </div>
+        <div className="form-group toggle-row">
+          <div className="toggle-info">
+            <span className="toggle-title">Fixed Expense</span>
+            <span className="toggle-desc">Occurs regularly (rent, subs)</span>
+          </div>
+          <label className="toggle-switch">
             <input
               type="checkbox"
               name="isFixed"

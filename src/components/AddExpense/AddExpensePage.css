@@ -134,11 +134,36 @@
   box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
 }
 
-/* Payment Methods */
+/* Payment Method pill buttons */
 .payment-methods {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.filter-pill {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.filter-pill:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.filter-pill.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
 }
 
 .pm-btn {
@@ -148,12 +173,29 @@
 }
 
 /* Toggle Switch */
-.toggle-group {
+.toggle-group,
+.toggle-row {
   margin-top: 0.5rem;
   padding: 1rem;
   background: rgba(0, 0, 0, 0.15);
   border-radius: var(--radius-md);
   border: 1px solid var(--glass-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toggle-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.toggle-switch {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin: 0;
 }
 
 .toggle-label {
@@ -161,7 +203,8 @@
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
-  margin: 0 !important; /* override global label margin */
+  width: 100%;
+  margin: 0 !important;
 }
 
 .toggle-title {
