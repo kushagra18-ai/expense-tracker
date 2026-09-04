@@ -94,15 +94,25 @@ const AddExpensePage = () => {
       return;
     }
 
+    // Resolve human-readable names so Google Sheets columns are populated
+    const selectedCat = categories?.find(c => c.id === formData.categoryId);
+    const selectedSub = selectedCat?.subcategories?.find(s => s.id === formData.subcategoryId);
+    const enrichedData = {
+      ...formData,
+      amount: Number(formData.amount),
+      categoryName: selectedCat?.name || '',
+      subcategoryName: selectedSub?.name || '',
+    };
+
     try {
       if (isEditMode) {
-        const { syncResult } = await editExpense(id, { ...formData, amount: Number(formData.amount) });
+        const { syncResult } = await editExpense(id, enrichedData);
         showToast('Expense updated', 'success');
         if (syncResult && !syncResult.success) {
           showToast('Saved locally. Sheet sync failed: ' + syncResult.error, 'warning');
         }
       } else {
-        const { syncResult } = await addExpense({ ...formData, amount: Number(formData.amount) });
+        const { syncResult } = await addExpense(enrichedData);
         showToast('Expense added', 'success');
         if (syncResult && !syncResult.success) {
           showToast('Saved locally. Sheet sync failed: ' + syncResult.error, 'warning');
