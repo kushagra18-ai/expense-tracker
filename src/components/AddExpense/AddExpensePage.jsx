@@ -41,20 +41,42 @@ const AddExpensePage = () => {
   // when `categories` loads) won't overwrite what the user has typed.
   useEffect(() => {
     if (!isEditMode) return;
-    if (filledRef.current) return;          // already filled — don't overwrite
+    if (filledRef.current) return;
     const exp = expenses.find(e => e.id === id);
-    if (!exp) return;                       // not loaded yet — wait for next render
+    if (!exp) return;
     filledRef.current = true;
+
+    // Resolve categoryId/subcategoryId from names for old expenses that only
+    // have categoryName/subcategoryName stored (before the fix was applied).
+    let categoryId = exp.categoryId || '';
+    let subcategoryId = exp.subcategoryId || '';
+    if (!categoryId && exp.categoryName && categories?.length > 0) {
+      const cat = categories.find(c => c.name === exp.categoryName);
+      if (cat) {
+        categoryId = cat.id;
+        if (!subcategoryId && exp.subcategoryName) {
+          const sub = cat.subcategories?.find(s => s.name === exp.subcategoryName);
+          if (sub) subcategoryId = sub.id;
+        }
+      }
+    }
+    // Final fallback: use first category so dropdown is never blank
+    if (!categoryId && categories?.length > 0) {
+      categoryId = categories[0].id;
+      subcategoryId = categories[0].subcategories?.[0]?.id || '';
+    }
+
     setFormData({
       amount: exp.amount.toString(),
-      categoryId: exp.categoryId || '',
-      subcategoryId: exp.subcategoryId || '',
+      categoryId,
+      subcategoryId,
       date: exp.date,
       description: exp.description || '',
       paymentMethod: exp.paymentMethod || 'UPI',
       isFixed: !!exp.isFixed,
     });
-  }, [id, isEditMode, expenses]);
+  }, [id, isEditMode, expenses, categories]);
+
 
   // Add mode: set default category/subcategory once categories load.
   // Skipped entirely in edit mode.

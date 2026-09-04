@@ -57,12 +57,18 @@ export async function sheetExists(spreadsheetId, sheetName) {
   return info.sheets?.some(s => s.properties.title === sheetName) || false;
 }
 
+// Per-session cache: tracks which spreadsheets have had their sheet tabs created.
+// Avoids an extra API round-trip on every single expense write.
+const sheetSetupCache = new Set();
+
 /**
  * Ensure the Expenses sheet tab exists with the correct headers.
- * Safe to call repeatedly — it no-ops if the tab already exists.
+ * Uses an in-memory cache so it only runs once per spreadsheet per session.
  */
 export async function ensureExpensesSheet(spreadsheetId) {
-  return createExpensesSheet(spreadsheetId);
+  if (sheetSetupCache.has(spreadsheetId)) return; // already done this session
+  await createExpensesSheet(spreadsheetId);
+  sheetSetupCache.add(spreadsheetId);
 }
 
 /**
