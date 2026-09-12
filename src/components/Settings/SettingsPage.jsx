@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './SettingsPage.css';
 import BudgetSettings from './BudgetSettings';
 import GoogleSheetsSetup from './GoogleSheetsSetup';
@@ -25,6 +26,7 @@ const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = false }
 };
 
 export default function SettingsPage() {
+  const navigate = useNavigate();
   const { expenses } = useExpenses();
   
   const totalSpending = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -73,7 +75,21 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="about-footer">
-            <p>Storage: Local Device & Google Sheets</p>
+            <p>Storage: Local Device &amp; Google Sheets</p>
+            <div className="about-legal">
+              <button
+                className="privacy-link-btn"
+                onClick={() => navigate('/privacy')}
+              >
+                🔒 Privacy Policy
+              </button>
+              <a
+                href="mailto:kushagrarastogi8859@gmail.com"
+                className="privacy-link-btn"
+              >
+                ✉️ Contact Us
+              </a>
+            </div>
           </div>
         </div>
       </CollapsibleSection>
