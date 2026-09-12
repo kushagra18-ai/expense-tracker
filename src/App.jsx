@@ -9,6 +9,7 @@ const AddExpensePage = React.lazy(() => import('./components/AddExpense/AddExpen
 const AnalyticsPage = React.lazy(() => import('./components/Analytics/AnalyticsPage').catch(() => ({ default: () => <div className="page">Analytics Content (Stub)</div> })));
 const SettingsPage = React.lazy(() => import('./components/Settings/SettingsPage').catch(() => ({ default: () => <div className="page">Settings Content (Stub)</div> })));
 const PrivacyPolicy = React.lazy(() => import('./components/Legal/PrivacyPolicy').catch(() => ({ default: () => <div className="page">Privacy Policy</div> })));
+const TermsOfService = React.lazy(() => import('./components/Legal/TermsOfService').catch(() => ({ default: () => <div className="page">Terms of Service</div> })));
 
 
 const LoadingFallback = () => (
@@ -34,6 +35,7 @@ function App() {
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
 
           </Routes>
         </Suspense>

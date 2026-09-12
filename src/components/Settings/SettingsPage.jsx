@@ -83,6 +83,12 @@ export default function SettingsPage() {
               >
                 🔒 Privacy Policy
               </button>
+              <button
+                className="privacy-link-btn"
+                onClick={() => navigate('/terms')}
+              >
+                📄 Terms of Service
+              </button>
               <a
                 href="mailto:kushagrarastogi8859@gmail.com"
                 className="privacy-link-btn"
